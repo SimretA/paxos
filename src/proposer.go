@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 )
 
 func CreateProposer(id int, val string, srvr *servers, acceptors ...int) *proposer {
@@ -25,43 +26,50 @@ type proposer struct {
 }
 
 func (p *proposer) run() {
-	for !(p.getRecevPromiseCount() > p.majority()) {
+	//for !(p.getRecevPromiseCount() > p.majority()) {
+	for {
+		fmt.Println("inloop")
 		sendMsgs := p.prepare()
 		for _, val := range sendMsgs {
 			p.srvr.sendMessage(val)
 			fmt.Println("propose sent")
 		}
-
-		m := p.srvr.receiveMessage(p.id)
-		if m == nil {
-			log.Println("[Proposer: no msg... ")
-			continue
-		}
-		log.Println("[Proposer: recev", m)
-		switch m.typ {
-		case 2: //for promise
-			log.Println(" proposer recev a promise from ", m.from)
-			p.checkReceivePromise(*m)
-		default:
-			panic("Unsupport message.")
-		}
+		fmt.Println("Sleeping")
+		time.Sleep(10 * time.Millisecond)
+		go p.receiveMessage()
+		fmt.Println("Done")
 
 	}
 }
+func (p *proposer) receiveMessage() {
+	m := p.srvr.receiveMessage(1)
+	if m == nil {
+		log.Println("[Proposer: no msg... ")
+		return
+	}
+	log.Println("[Proposer: recev", m)
+	switch m.typ {
+	case 2: //for promise
+		log.Println(" proposer recev a promise from ", m.from)
+		p.checkReceivePromise(*m)
+	default:
+		panic("Unsupport message.")
+	}
 
+}
 func (p *proposer) majority() int {
 	return len(p.acceptors)/2 + 1
 }
 func (p *proposer) getRecevPromiseCount() int {
 	recvCount := 0
 	for _, acepMsg := range p.acceptors {
-		log.Println(" proposer has total ", len(p.acceptors), " acceptor ", acepMsg, " current Num:", p.getNewSeq(), " msgNum:", acepMsg.seq)
+		fmt.Println(" proposer has total ", len(p.acceptors), " current Num:", p.getNewSeq(), " msgNum:", acepMsg.seq)
 		if acepMsg.seq == p.getNewSeq() {
-			log.Println("recv ++", recvCount)
+			fmt.Println("Received ", recvCount)
 			recvCount++
 		}
 	}
-	log.Println("Current proposer recev promise count=", recvCount)
+	fmt.Println("Current proposer recev promise count=", recvCount)
 	return recvCount
 }
 
