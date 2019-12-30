@@ -5,13 +5,12 @@ import (
 	"time"
 )
 
+func CreateServer(num int) *servers {
+	srvrs := servers{recvQueue: make(map[int]chan value, 0)}
 
-func CreateServer(num int) *servers{
-	srvrs := servers{recvQueue: make(map[int] chan value, 0)}
-
-	for i := 0; i< num; i++{
+	for i := 0; i < num; i++ {
 		fmt.Println("creating server ", i)
-		srvrs.recvQueue[i]= make(chan value, 1024)
+		srvrs.recvQueue[i] = make(chan value, 1024)
 	}
 	return &srvrs
 }
@@ -27,16 +26,15 @@ func (s *servers) sendMessage(value2 value) {
 func (s *servers) receiveMessage(id int) *value {
 
 	select {
-	case msg:= <-s.recvQueue[id]:
+	case msg := <-s.recvQueue[id]:
 		//msg := <-s.recvQueue[id]
-		fmt.Println("Received message ",msg.typ," Value ",msg.val)
+		fmt.Println("Received message ", msg.typ, " Value ", msg.val)
 		return &msg
 	case <-time.After(1000):
-		fmt.Println("Time Out")
+		//fmt.Println("Time Out")
 		return nil
 	}
 }
-
 
 /**
 typ:
@@ -45,7 +43,6 @@ typ:
 	3 for Propose
 	4 for Accept
 **/
-
 
 type value struct {
 	from   int

@@ -7,7 +7,7 @@ import (
 )
 
 func CreateProposer(id int, val string, srvr *servers, acceptors ...int) *proposer {
-	prop := proposer{id: id, proposeVal: val, seq: 0, srvr: srvr}
+	prop := proposer{id: id, proposeVal: val, seq: 1, srvr: srvr}
 	prop.acceptors = make(map[int]value, len(acceptors))
 
 	for _, acceptor := range acceptors {
@@ -26,8 +26,9 @@ type proposer struct {
 }
 
 func (p *proposer) run() {
-	//for !(p.getRecevPromiseCount() > p.majority()) {
-	for {
+	for !(p.getRecevPromiseCount() > p.majority()) {
+		fmt.Println("recvd promises ", p.getRecevPromiseCount())
+		//for {
 		fmt.Println("inloop")
 		sendMsgs := p.prepare()
 		for _, val := range sendMsgs {
@@ -36,13 +37,21 @@ func (p *proposer) run() {
 		}
 		fmt.Println("Sleeping")
 		time.Sleep(10 * time.Millisecond)
-		go p.receiveMessage()
+		p.receiveMessage()
 		fmt.Println("Done")
 
 	}
+	fmt.Println("Proposing")
+	msgs := p.propose()
+	fmt.Println(msgs)
+	for _, msg := range msgs {
+
+		p.srvr.sendMessage(msg)
+		fmt.Println("Proposed value ", msg.val, " to ", msg.to)
+	}
 }
 func (p *proposer) receiveMessage() {
-	m := p.srvr.receiveMessage(1)
+	m := p.srvr.receiveMessage(0)
 	if m == nil {
 		log.Println("[Proposer: no msg... ")
 		return
@@ -53,7 +62,8 @@ func (p *proposer) receiveMessage() {
 		log.Println(" proposer recev a promise from ", m.from)
 		p.checkReceivePromise(*m)
 	default:
-		panic("Unsupport message.")
+		return
+		//panic("Unsupport message.")
 	}
 
 }
@@ -63,8 +73,8 @@ func (p *proposer) majority() int {
 func (p *proposer) getRecevPromiseCount() int {
 	recvCount := 0
 	for _, acepMsg := range p.acceptors {
-		fmt.Println(" proposer has total ", len(p.acceptors), " current Num:", p.getNewSeq(), " msgNum:", acepMsg.seq)
-		if acepMsg.seq == p.getNewSeq() {
+		fmt.Println("Proposer has total ", len(p.acceptors), " acceptors  current Seq:", p.getNewSeq(), " Accepted message sequence:", p.proposeNum)
+		if acepMsg.seq <= p.getNewSeq() {
 			fmt.Println("Received ", recvCount)
 			recvCount++
 		}
@@ -88,11 +98,37 @@ func (p *proposer) prepare() []value {
 	return msgList
 }
 
+func (p *proposer) propose() []value {
+	p.seq++
+
+	sentCount := 0
+	var msgs []value
+	for acceptorId, acceptorVal := range p.acceptors {
+		if acceptorVal.seq <= p.getNewSeq() {
+			newMsg := value{from: 0, to: acceptorId, typ: 3, seq: p.getNewSeq(), val: p.proposeVal}
+			msgs = append(msgs, newMsg)
+			sentCount++
+
+		}
+	}
+	return msgs
+}
+
 func (p *proposer) getNewSeq() int {
 	p.proposeNum = p.seq<<4 | p.id
 	return p.proposeNum
 }
 
 func (p *proposer) checkReceivePromise(v value) {
+	previousPromise := p.acceptors[v.from]
+	fmt.Println("New promise ", v)
+	if previousPromise.seq < v.seq {
+		p.acceptors[v.from] = v
+		if v.seq > p.getNewSeq() {
+			p.proposeNum = v.seq
+			p.proposeVal = v.val
+
+		}
+	}
 
 }
